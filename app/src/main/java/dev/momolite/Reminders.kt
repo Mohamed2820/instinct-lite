@@ -13,10 +13,14 @@ import android.os.Build
 object Reminders {
     const val CHANNEL = "reminders"
 
-    fun schedule(ctx: Context, r: Reminder) {
+    /** Returns false when the device refuses the alarm; the reminder stays saved in the list. */
+    fun schedule(ctx: Context, r: Reminder): Boolean = try {
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         // Inexact-while-idle alarm: no special permission, may fire a few minutes late.
         am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, r.at, pending(ctx, r.id, r.text))
+        true
+    } catch (e: SecurityException) {
+        false
     }
 
     fun cancel(ctx: Context, id: Long) {
@@ -35,6 +39,14 @@ object Reminders {
     }
 
     fun notify(ctx: Context, id: Long, text: String) {
+        try {
+            post(ctx, id, text)
+        } catch (e: SecurityException) {
+            // Notifications blocked at the system level; nothing else we can do from a receiver.
+        }
+    }
+
+    private fun post(ctx: Context, id: Long, text: String) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
