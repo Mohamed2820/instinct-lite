@@ -18,4 +18,6 @@
     <string name="reminder_empty">اكتب نص التذكير الأول.</string>
     <string name="reminder_channel">التذكيرات</string>
     <string name="reminder_title">تذكير</string>
+    <string name="reminder_notifications_blocked">التذكير اتحفظ، بس إذن الإشعارات مرفوض، فمش هيوصلك تنبيه.</string>
+    <string name="reminder_schedule_failed">مش قادر أظبط المنبّه على الجهاز ده. التذكير محفوظ في القايمة.</string>
 </resources>
