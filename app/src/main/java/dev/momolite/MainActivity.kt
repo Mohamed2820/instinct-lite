@@ -4,13 +4,10 @@ import android.Manifest
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -38,16 +35,7 @@ class MainActivity : Activity() {
             override fun getItemId(p: Int) = shown[p].id
             override fun getView(p: Int, v: View?, parent: ViewGroup): View {
                 val row = v ?: LayoutInflater.from(this@MainActivity).inflate(R.layout.item_message, parent, false)
-                val b = row.findViewById<TextView>(R.id.bubble)
-                val m = shown[p]
-                b.text = m.text
-                val mine = m.role == "user"
-                b.setTextColor(if (mine) Color.WHITE else Color.parseColor("#222222"))
-                b.background = GradientDrawable().apply {
-                    cornerRadius = 36f
-                    setColor(Color.parseColor(if (mine) "#1F4E79" else if (m.role == "system") "#FFF3CD" else "#E4E8EE"))
-                }
-                (b.layoutParams as FrameLayout.LayoutParams).gravity = if (mine) Gravity.START else Gravity.END
+                Bubbles.apply(row.findViewById(R.id.bubble), shown[p])
                 return row
             }
         }
@@ -55,11 +43,11 @@ class MainActivity : Activity() {
 
         // Resume last conversation or start the first one.
         val last = db.conversations().firstOrNull()
-        openConversation(last?.id ?: db.newConversation("محادثة جديدة"))
+        openConversation(last?.id ?: db.newConversation(Titles.FALLBACK))
 
         findViewById<Button>(R.id.send).setOnClickListener { send() }
         findViewById<Button>(R.id.new_chat).setOnClickListener {
-            openConversation(db.newConversation("محادثة جديدة")); show(R.id.page_chat)
+            openConversation(db.newConversation(Titles.FALLBACK)); show(R.id.page_chat)
         }
         findViewById<TextView>(R.id.tab_chat).setOnClickListener { show(R.id.page_chat) }
         findViewById<TextView>(R.id.tab_history).setOnClickListener { refreshHistory(); show(R.id.page_history) }
@@ -67,6 +55,13 @@ class MainActivity : Activity() {
 
         setupReminders()
         show(R.id.page_chat)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQ_NOTIFICATIONS && grantResults.isNotEmpty() && grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, R.string.reminder_notifications_blocked, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun show(page: Int) {
@@ -92,7 +87,7 @@ class MainActivity : Activity() {
         if (text.isEmpty()) return
         input.setText("")
         shown.add(db.addMessage(convId, "user", text))
-        if (shown.count { it.role == "user" } == 1) db.renameConversation(convId, text.take(40))
+        if (shown.count { it.role == "user" } == 1) db.renameConversation(convId, Titles.derive(text))
         val reply = provider.reply(shown)
         shown.add(db.addMessage(convId, if (reply == null) "system" else "assistant", reply ?: getString(R.string.no_provider)))
         msgAdapter.notifyDataSetChanged()
@@ -106,20 +101,18 @@ class MainActivity : Activity() {
         lv.adapter = rowAdapter(list.size,
             { i -> list[i].title to fmt.format(Date(list[i].updated)) },
             { i -> db.deleteConversation(list[i].id)
-                if (list[i].id == convId) openConversation(db.conversations().firstOrNull()?.id ?: db.newConversation("محادثة جديدة"))
+                if (list[i].id == convId) openConversation(db.conversations().firstOrNull()?.id ?: db.newConversation(Titles.FALLBACK))
                 refreshHistory() })
         lv.setOnItemClickListener { _, _, i, _ -> openConversation(list[i].id); show(R.id.page_chat) }
     }
 
     private fun refreshReminders() {
-        val now = System.currentTimeMillis()
         val list = db.reminders()
         findViewById<View>(R.id.reminders_empty).visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
         val fmt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
         findViewById<ListView>(R.id.reminders_list).adapter = rowAdapter(list.size,
             { i -> list[i].text to fmt.format(Date(list[i].at)) },
             { i -> Reminders.cancel(this, list[i].id); db.deleteReminder(list[i].id); refreshReminders() })
-        if (now < 0) return
     }
 
     private fun rowAdapter(n: Int, content: (Int) -> Pair<String, String>, onDelete: (Int) -> Unit) = object : BaseAdapter() {
@@ -155,15 +148,21 @@ class MainActivity : Activity() {
         findViewById<Button>(R.id.add_reminder).setOnClickListener {
             val et = findViewById<EditText>(R.id.reminder_text)
             val text = et.text.toString().trim()
-            if (text.isEmpty()) { Toast.makeText(this, R.string.reminder_empty, Toast.LENGTH_SHORT).show(); return@setOnClickListener }
-            if (pick.timeInMillis <= System.currentTimeMillis()) { Toast.makeText(this, R.string.reminder_in_past, Toast.LENGTH_SHORT).show(); return@setOnClickListener }
-            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+            when (ReminderRules.validate(text, pick.timeInMillis, System.currentTimeMillis())) {
+                ReminderError.EMPTY_TEXT -> { Toast.makeText(this, R.string.reminder_empty, Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                ReminderError.TIME_IN_PAST -> { Toast.makeText(this, R.string.reminder_in_past, Toast.LENGTH_SHORT).show(); return@setOnClickListener }
+                null -> Unit
             }
-            val r = Reminder(0, text, pick.timeInMillis)
-            val id = db.addReminder(text, r.at)
-            Reminders.schedule(this, r.copy(id = id))
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATIONS)
+            }
+            val id = db.addReminder(text, pick.timeInMillis)
+            if (!Reminders.schedule(this, Reminder(id, text, pick.timeInMillis))) {
+                Toast.makeText(this, R.string.reminder_schedule_failed, Toast.LENGTH_LONG).show()
+            }
             et.setText(""); refreshReminders()
         }
     }
+
+    companion object { private const val REQ_NOTIFICATIONS = 1 }
 }
