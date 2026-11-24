@@ -8,6 +8,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.os.Build
 
 object Reminders {
@@ -28,12 +29,40 @@ object Reminders {
         am.cancel(pending(ctx, id, ""))
     }
 
-    fun rescheduleAll(ctx: Context) {
+    /** True when the app can actually show a notification right now. */
+    fun notificationsEnabled(ctx: Context): Boolean {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        return nm.areNotificationsEnabled()
+    }
+
+    /** Counts of what recovery did, so a failure is visible in logs instead of silent. */
+    data class BootReport(val scheduled: Int, val scheduleFailed: Int, val delivered: Int, val keptPending: Int, val cleared: Int)
+
+    /**
+     * Re-arms future alarms and recovers past-due reminders after boot or app open.
+     * Every decision comes from ReminderPlan.decide: delivered rows are cleared without
+     * re-firing, blocked notifications keep their row pending, and failed scheduling
+     * is counted and logged, never swallowed.
+     */
+    fun rescheduleAll(ctx: Context): BootReport {
         val db = Db(ctx)
-        val (future, pastDue) = ReminderPlan.split(db.reminders(), System.currentTimeMillis())
-        future.forEach { schedule(ctx, it) }
-        // Missed while the phone was off: deliver now instead of dropping silently.
-        pastDue.forEach { notify(ctx, it.id, it.text); db.deleteReminder(it.id) }
+        val now = System.currentTimeMillis()
+        val enabled = notificationsEnabled(ctx)
+        var scheduled = 0; var failed = 0; var delivered = 0; var kept = 0; var cleared = 0
+        db.reminders().forEach { r ->
+            when (ReminderPlan.decide(r, now, enabled)) {
+                ReminderAction.SCHEDULE -> if (schedule(ctx, r)) scheduled++ else failed++
+                ReminderAction.DELIVER_NOW -> {
+                    notify(ctx, r.id, r.text)
+                    db.markReminderDelivered(r.id)
+                    db.deleteReminder(r.id)
+                    delivered++
+                }
+                ReminderAction.KEEP_PENDING -> kept++
+                ReminderAction.CLEAR_DELIVERED -> { cancel(ctx, r.id); db.deleteReminder(r.id); cleared++ }
+            }
+        }
+        return BootReport(scheduled, failed, delivered, kept, cleared)
     }
 
     private fun pending(ctx: Context, id: Long, text: String): PendingIntent {
@@ -68,13 +97,29 @@ class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         val id = intent.getLongExtra("id", 0L)
         val text = intent.getStringExtra("text") ?: return
+        if (!Reminders.notificationsEnabled(ctx)) {
+            // Stay pending: the row remains visible as missed and recovery retries later.
+            Log.w(TAG, "reminder $id fired but notifications are blocked; keeping it pending")
+            return
+        }
+        val db = Db(ctx)
         Reminders.notify(ctx, id, text)
-        Db(ctx).deleteReminder(id)
+        // Mark before deleting: a crash between the two leaves a delivered row that
+        // recovery clears without re-firing, so a reminder can never be delivered twice.
+        db.markReminderDelivered(id)
+        db.deleteReminder(id)
     }
+
+    private companion object { const val TAG = "ReminderReceiver" }
 }
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) Reminders.rescheduleAll(ctx)
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            val report = Reminders.rescheduleAll(ctx)
+            Log.i(TAG, "reminder recovery: $report")
+        }
     }
+
+    private companion object { const val TAG = "BootReceiver" }
 }
