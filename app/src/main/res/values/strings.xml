@@ -21,5 +21,7 @@
     <string name="reminder_channel">التذكيرات</string>
     <string name="reminder_title">تذكير</string>
     <string name="reminder_notifications_blocked">التذكير اتحفظ، بس إذن الإشعارات مرفوض، فمش هيوصلك تنبيه.</string>
+    <string name="reminder_missed_retry">عدّى وقته ولسه ماتبعتش، هيتبعت أول ما التطبيق يتفتح أو الجهاز يعيد التشغيل.</string>
+    <string name="reminder_missed_blocked">عدّى وقته ومش هيتبعت لأن إذن الإشعارات مقفول، فعّله من إعدادات النظام وهيتحفظ في القايمة.</string>
     <string name="reminder_schedule_failed">مش قادر أظبط المنبّه على الجهاز ده. التذكير محفوظ في القايمة.</string>
 </resources>
