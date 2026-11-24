@@ -54,6 +54,9 @@ class MainActivity : Activity() {
         findViewById<TextView>(R.id.tab_reminders).setOnClickListener { refreshReminders(); show(R.id.page_reminders) }
 
         setupReminders()
+        // Opening the app also recovers reminders: re-arms lost alarms and delivers
+        // anything missed while the phone was off (kept pending if notifications are blocked).
+        Reminders.rescheduleAll(this)
         show(R.id.page_chat)
     }
 
@@ -118,8 +121,18 @@ class MainActivity : Activity() {
         val list = db.reminders()
         findViewById<View>(R.id.reminders_empty).visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
         val fmt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+        val now = System.currentTimeMillis()
+        val canNotify = Reminders.notificationsEnabled(this)
         findViewById<ListView>(R.id.reminders_list).adapter = rowAdapter(list.size,
-            { i -> list[i].text to fmt.format(Date(list[i].at)) },
+            { i ->
+                val r = list[i]
+                val sub = when {
+                    r.at > now -> fmt.format(Date(r.at))
+                    canNotify -> getString(R.string.reminder_missed_retry)
+                    else -> getString(R.string.reminder_missed_blocked)
+                }
+                r.text to sub
+            },
             { i -> Reminders.cancel(this, list[i].id); db.deleteReminder(list[i].id); refreshReminders() })
     }
 
