@@ -14,6 +14,8 @@
     <string name="pick_time">اختار الساعة</string>
     <string name="add_reminder">أضف تذكير</string>
     <string name="delete">حذف</string>
+    <string name="cancel">إلغاء</string>
+    <string name="delete_conversation_confirm">حذف «%1$s» وكل رسايلها؟ مفيش تراجع.</string>
     <string name="reminder_in_past">الوقت ده عدّى. اختار وقت جاي.</string>
     <string name="reminder_empty">اكتب نص التذكير الأول.</string>
     <string name="reminder_channel">التذكيرات</string>
