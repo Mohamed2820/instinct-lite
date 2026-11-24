@@ -39,24 +39,37 @@ class LogicTest {
         assertNull(seen)
     }
 
-    @Test fun reminderPlanSplitsFutureAndPastDue() {
-        val future = Reminder(1, "صلاة الفجر", now + 60_000)
-        val past = Reminder(2, "مكالمة فاتت", now - 60_000)
-        val (toSchedule, toFire) = ReminderPlan.split(listOf(future, past), now)
-        assertEquals(listOf(future), toSchedule)
-        assertEquals(listOf(past), toFire)
+    @Test fun futurePendingReminderIsScheduled() {
+        val future = Reminder(1, "a", 2_000L)
+        assertEquals(ReminderAction.SCHEDULE, ReminderPlan.decide(future, 1_000L, notificationsEnabled = true))
+        assertEquals(ReminderAction.SCHEDULE, ReminderPlan.decide(future, 1_000L, notificationsEnabled = false))
     }
 
-    @Test fun reminderPlanBoundaryIsPastDue() {
-        val edge = Reminder(3, "دلوقتي", now)
-        val (toSchedule, toFire) = ReminderPlan.split(listOf(edge), now)
-        assertEquals(emptyList<Reminder>(), toSchedule)
-        assertEquals(listOf(edge), toFire)
+    @Test fun pastDuePendingReminderFiresWhenNotificationsWork() {
+        val past = Reminder(2, "b", 500L)
+        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.decide(past, 1_000L, notificationsEnabled = true))
     }
 
-    @Test fun reminderPlanHandlesEmptyList() {
-        val (toSchedule, toFire) = ReminderPlan.split(emptyList(), now)
-        assertEquals(0, toSchedule.size)
-        assertEquals(0, toFire.size)
+    @Test fun pastDuePendingReminderIsKeptWhenNotificationsBlocked() {
+        val past = Reminder(2, "b", 500L)
+        // The row must survive: blocked notifications never silently delete a reminder.
+        assertEquals(ReminderAction.KEEP_PENDING, ReminderPlan.decide(past, 1_000L, notificationsEnabled = false))
+    }
+
+    @Test fun boundaryReminderCountsAsPastDue() {
+        val edge = Reminder(3, "c", 1_000L)
+        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.decide(edge, 1_000L, notificationsEnabled = true))
+    }
+
+    @Test fun deliveredReminderIsClearedNotRefired() {
+        // Crash left a delivered row behind: past-due alone never proves "never delivered".
+        val leftover = Reminder(4, "d", 500L, state = REMINDER_DELIVERED)
+        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = true))
+        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = false))
+    }
+
+    @Test fun deliveredReminderIsClearedEvenWhenItsTimeIsStillFuture() {
+        val weird = Reminder(5, "e", 9_000L, state = REMINDER_DELIVERED)
+        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(weird, 1_000L, notificationsEnabled = true))
     }
 }
