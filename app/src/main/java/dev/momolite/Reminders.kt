@@ -29,8 +29,11 @@ object Reminders {
     }
 
     fun rescheduleAll(ctx: Context) {
-        val now = System.currentTimeMillis()
-        Db(ctx).reminders().filter { it.at > now }.forEach { schedule(ctx, it) }
+        val db = Db(ctx)
+        val (future, pastDue) = ReminderPlan.split(db.reminders(), System.currentTimeMillis())
+        future.forEach { schedule(ctx, it) }
+        // Missed while the phone was off: deliver now instead of dropping silently.
+        pastDue.forEach { notify(ctx, it.id, it.text); db.deleteReminder(it.id) }
     }
 
     private fun pending(ctx: Context, id: Long, text: String): PendingIntent {
