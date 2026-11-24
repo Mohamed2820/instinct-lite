@@ -93,3 +93,22 @@ object ProviderChoice {
     fun useCloudflare(enabled: Boolean, hasToken: Boolean, hasAccountId: Boolean): Boolean =
         enabled && hasToken && hasAccountId
 }
+
+/** Why a live provider attempt failed; kinds map to honest, secret-free user messages. */
+enum class ProviderError { NETWORK, AUTH, RATE_LIMIT, SERVER, BAD_RESPONSE }
+
+/** Outcome of a live provider attempt: either a reply or a classified failure. */
+sealed class ProviderResult {
+    data class Reply(val text: String) : ProviderResult()
+    data class Failed(val kind: ProviderError) : ProviderResult()
+}
+
+object ProviderErrors {
+    /** HTTP status to error kind. Response bodies are never surfaced: they may echo request data. */
+    fun fromHttpCode(code: Int): ProviderError = when {
+        code == 401 || code == 403 -> ProviderError.AUTH
+        code == 429 -> ProviderError.RATE_LIMIT
+        code in 500..599 -> ProviderError.SERVER
+        else -> ProviderError.SERVER
+    }
+}
