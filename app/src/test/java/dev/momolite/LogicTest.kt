@@ -33,7 +33,30 @@ class LogicTest {
         assertEquals(Titles.FALLBACK, Titles.derive("   "))
     }
 
-    @Test fun noProviderNeverFakesAReply() {
-        assertNull(NoProvider.reply(listOf(Msg(1, "user", "أهلا", 0))))
+    @Test fun noProviderCallsBackWithNull() {
+        var seen: String? = "unset"
+        NoProvider.reply(listOf(Msg(1, "user", "أهلا", 0))) { seen = it }
+        assertNull(seen)
+    }
+
+    @Test fun reminderPlanSplitsFutureAndPastDue() {
+        val future = Reminder(1, "صلاة الفجر", now + 60_000)
+        val past = Reminder(2, "مكالمة فاتت", now - 60_000)
+        val (toSchedule, toFire) = ReminderPlan.split(listOf(future, past), now)
+        assertEquals(listOf(future), toSchedule)
+        assertEquals(listOf(past), toFire)
+    }
+
+    @Test fun reminderPlanBoundaryIsPastDue() {
+        val edge = Reminder(3, "دلوقتي", now)
+        val (toSchedule, toFire) = ReminderPlan.split(listOf(edge), now)
+        assertEquals(emptyList<Reminder>(), toSchedule)
+        assertEquals(listOf(edge), toFire)
+    }
+
+    @Test fun reminderPlanHandlesEmptyList() {
+        val (toSchedule, toFire) = ReminderPlan.split(emptyList(), now)
+        assertEquals(0, toSchedule.size)
+        assertEquals(0, toFire.size)
     }
 }
