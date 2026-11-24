@@ -68,6 +68,11 @@ class LogicTest {
         assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = false))
     }
 
+    @Test fun receiverDeliversOnlyWhenNotificationsWork() {
+        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.onFire(notificationsEnabled = true))
+        assertEquals(ReminderAction.KEEP_PENDING, ReminderPlan.onFire(notificationsEnabled = false))
+    }
+
     @Test fun deliveredReminderIsClearedEvenWhenItsTimeIsStillFuture() {
         val weird = Reminder(5, "e", 9_000L, state = REMINDER_DELIVERED)
         assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(weird, 1_000L, notificationsEnabled = true))
