@@ -25,4 +25,20 @@
     <string name="reminder_missed_blocked">عدّى وقته ومش هيتبعت لأن إذن الإشعارات مقفول، فعّله من إعدادات النظام وهيتحفظ في القايمة.</string>
     <string name="reminder_reschedule_failed">في %1$d تذكير معرفناش نظبط منبّهه على الجهاز ده. لسه محفوظ في القايمة وبنحاول تاني كل ما التطبيق يتفتح.</string>
     <string name="reminder_schedule_failed">مش قادر أظبط المنبّه على الجهاز ده. التذكير محفوظ في القايمة.</string>
+    <string name="tab_settings">الإعدادات</string>
+    <string name="settings_api_heading">مفتاح الـ API</string>
+    <string name="settings_api_explainer">لو عندك حساب Cloudflare، اكتب المفتاح ومعرّف الحساب بنفسك هنا. بيتحفظوا مشفّرين على الجهاز بس، ومبيتسجلوش في أي سجل أو ملف.</string>
+    <string name="settings_token_hint">مفتاح API</string>
+    <string name="settings_account_hint">معرّف الحساب (Account ID)</string>
+    <string name="settings_save">احفظ</string>
+    <string name="settings_saved">اتحفظ مشفّر على الجهاز.</string>
+    <string name="settings_enable">فعّل مزوّد الذكاء الاصطناعي</string>
+    <string name="settings_status_off">المزوّد مقفول. الشات هيقول بصراحة إن مفيش مزوّد.</string>
+    <string name="settings_status_no_key">المزوّد متفعّل بس مفيش مفتاح محفوظ، فالشات لسه من غير مزوّد.</string>
+    <string name="settings_status_on">المزوّد متفعّل والمفتاح محفوظ. ردود الشات هتيجي من Cloudflare Workers AI.</string>
+    <string name="privacy_heading">عن الخصوصية</string>
+    <string name="privacy_text">المحادثات والتذكيرات متخزّنة محليًا على جهازك بس. لو فعّلت المزوّد، اللي بيروح لـ Cloudflare هو نص رسالتك الحالية بس، من غير باقي المحادثة ومن غير أي ملفات. مفتاح الـ API متخزّن مشفّر على الجهاز ومبيبعتش لأي حد غير Cloudflare وقت الطلب. مفيش إحصائيات ولا تتبع ولا حسابات في التطبيق نفسه.</string>
+    <string name="delete_all_data">حذف كل بياناتي</string>
+    <string name="delete_all_confirm">هيمسح كل المحادثات والتذكيرات ومفتاح الـ API المحفوظ نهائيًا. متأكد؟</string>
+    <string name="delete_all_done">اتمسحت كل بياناتك من الجهاز.</string>
 </resources>
