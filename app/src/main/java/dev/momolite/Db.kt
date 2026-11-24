@@ -75,4 +75,11 @@ class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 2) {
         writableDatabase.update("reminders", v, "id=?", arrayOf(id.toString()))
     }
     fun deleteReminder(id: Long) { writableDatabase.delete("reminders", "id=?", arrayOf(id.toString())) }
+
+    /** Wipes every locally stored row: conversations, messages and reminders. */
+    fun clearAll() {
+        writableDatabase.delete("messages", null, null)
+        writableDatabase.delete("conversations", null, null)
+        writableDatabase.delete("reminders", null, null)
+    }
 }
