@@ -9,11 +9,14 @@ android {
         applicationId 'dev.momolite'
         minSdk 24
         targetSdk 34
-        versionCode 4
-        versionName '0.3.1'
+        versionCode 5
+        versionName '0.4.0'
     }
     buildTypes { release { minifyEnabled false } }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = '17' }
 }
-dependencies { testImplementation 'junit:junit:4.13.2' }
+dependencies {
+    implementation 'androidx.security:security-crypto:1.1.0'
+    testImplementation 'junit:junit:4.13.2'
+}
