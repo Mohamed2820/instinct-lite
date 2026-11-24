@@ -56,7 +56,10 @@ class MainActivity : Activity() {
         setupReminders()
         // Opening the app also recovers reminders: re-arms lost alarms and delivers
         // anything missed while the phone was off (kept pending if notifications are blocked).
-        Reminders.rescheduleAll(this)
+        val recovery = Reminders.rescheduleAll(this)
+        if (recovery.scheduleFailed > 0) {
+            Toast.makeText(this, getString(R.string.reminder_reschedule_failed, recovery.scheduleFailed), Toast.LENGTH_LONG).show()
+        }
         show(R.id.page_chat)
     }
 
