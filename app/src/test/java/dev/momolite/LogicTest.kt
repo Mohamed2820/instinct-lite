@@ -97,6 +97,31 @@ class LogicTest {
         assertNull(r2)
     }
 
+    @Test fun httpErrorMappingIsHonestAndSecretFree() {
+        assertEquals(ProviderError.AUTH, ProviderErrors.fromHttpCode(401))
+        assertEquals(ProviderError.AUTH, ProviderErrors.fromHttpCode(403))
+        assertEquals(ProviderError.RATE_LIMIT, ProviderErrors.fromHttpCode(429))
+        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttpCode(500))
+        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttpCode(503))
+        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttpCode(400))
+    }
+
+    @Test fun cloudflareDetailedFailureWithoutUserMessageIsClassified() {
+        // No network call is made when there is nothing to send; failure is classified, not silent.
+        var r: ProviderResult? = null
+        CloudflareWorkersAi("acc", "tok").replyDetailed(emptyList()) { r = it }
+        assertEquals(ProviderResult.Failed(ProviderError.BAD_RESPONSE), r)
+        var r2: ProviderResult? = null
+        CloudflareWorkersAi("acc", "tok").replyDetailed(listOf(Msg(1, "assistant", "hi", 1L))) { r2 = it }
+        assertEquals(ProviderResult.Failed(ProviderError.BAD_RESPONSE), r2)
+    }
+
+    @Test fun failureKindsCarryNoSecrets() {
+        // The failure type has no payload/token field at all: nothing secret can leak into a bubble.
+        val f: ProviderResult = ProviderResult.Failed(ProviderError.AUTH)
+        assertEquals("Failed(kind=AUTH)", f.toString())
+    }
+
     @Test fun providerStaysOffWithoutExplicitOptIn() {
         // Credentials alone never enable the provider.
         assertFalse(ProviderChoice.useCloudflare(enabled = false, hasToken = true, hasAccountId = true))
