@@ -7,16 +7,21 @@ import android.database.sqlite.SQLiteOpenHelper
 
 data class Msg(val id: Long, val role: String, val text: String, val ts: Long)
 data class Conv(val id: Long, val title: String, val updated: Long)
-data class Reminder(val id: Long, val text: String, val at: Long)
+const val REMINDER_PENDING = "pending"
+const val REMINDER_DELIVERED = "delivered"
+
+data class Reminder(val id: Long, val text: String, val at: Long, val state: String = REMINDER_PENDING)
 
 /** Local SQLite storage. Nothing leaves the device. */
-class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 1) {
+class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 2) {
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL("CREATE TABLE conversations(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, updated INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE messages(id INTEGER PRIMARY KEY AUTOINCREMENT, conv_id INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL)")
-        db.execSQL("CREATE TABLE reminders(id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, at INTEGER NOT NULL)")
+        db.execSQL("CREATE TABLE reminders(id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'pending')")
     }
-    override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) {}
+    override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) {
+        if (o < 2) db.execSQL("ALTER TABLE reminders ADD COLUMN state TEXT NOT NULL DEFAULT 'pending'")
+    }
 
     fun newConversation(title: String): Long {
         val v = ContentValues().apply { put("title", title); put("updated", System.currentTimeMillis()) }
@@ -58,10 +63,16 @@ class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 1) {
     }
     fun reminders(): List<Reminder> {
         val out = ArrayList<Reminder>()
-        readableDatabase.rawQuery("SELECT id,text,at FROM reminders ORDER BY at", null).use {
-            while (it.moveToNext()) out.add(Reminder(it.getLong(0), it.getString(1), it.getLong(2)))
+        readableDatabase.rawQuery("SELECT id,text,at,state FROM reminders ORDER BY at", null).use {
+            while (it.moveToNext()) out.add(Reminder(it.getLong(0), it.getString(1), it.getLong(2), it.getString(3)))
         }
         return out
+    }
+
+    /** Marks a reminder as delivered before deleting it: a crash between the two never causes a replay. */
+    fun markReminderDelivered(id: Long) {
+        val v = ContentValues().apply { put("state", REMINDER_DELIVERED) }
+        writableDatabase.update("reminders", v, "id=?", arrayOf(id.toString()))
     }
     fun deleteReminder(id: Long) { writableDatabase.delete("reminders", "id=?", arrayOf(id.toString())) }
 }
