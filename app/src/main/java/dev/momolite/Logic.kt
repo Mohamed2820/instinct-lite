@@ -27,3 +27,14 @@ object Titles {
         return if (t.isEmpty()) FALLBACK else t.take(MAX_LEN)
     }
 }
+
+/** Splits saved reminders for boot-time recovery. */
+object ReminderPlan {
+    /**
+     * Returns (still future, past due). Future reminders get scheduled again;
+     * past-due ones fire immediately so they are not silently dropped.
+     * A reminder exactly at [nowMillis] counts as past due.
+     */
+    fun split(reminders: List<Reminder>, nowMillis: Long): Pair<List<Reminder>, List<Reminder>> =
+        reminders.partition { it.at > nowMillis }
+}
