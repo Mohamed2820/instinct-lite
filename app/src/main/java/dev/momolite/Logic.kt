@@ -28,13 +28,33 @@ object Titles {
     }
 }
 
-/** Splits saved reminders for boot-time recovery. */
+/** What boot/app-open recovery does with one saved reminder. */
+enum class ReminderAction {
+    /** Future reminder: (re)arm its alarm. */
+    SCHEDULE,
+    /** Past-due pending reminder and notifications can be shown: fire it now. */
+    DELIVER_NOW,
+    /** Past-due pending reminder but notifications are blocked: keep it, never drop it silently. */
+    KEEP_PENDING,
+    /** Already delivered (possibly left over by a crash): clear it, never fire it again. */
+    CLEAR_DELIVERED
+}
+
+/** Decides reminder recovery from saved state, not from guesses about the past. */
 object ReminderPlan {
-    /**
-     * Returns (still future, past due). Future reminders get scheduled again;
-     * past-due ones fire immediately so they are not silently dropped.
-     * A reminder exactly at [nowMillis] counts as past due.
-     */
+    /** Kept so older callers compile; recovery decisions use [decide]. */
     fun split(reminders: List<Reminder>, nowMillis: Long): Pair<List<Reminder>, List<Reminder>> =
         reminders.partition { it.at > nowMillis }
+
+    /**
+     * A reminder exactly at [nowMillis] counts as past due. A delivered reminder is
+     * cleared rather than re-fired even when its time is past due, because a crash
+     * can leave a delivered row behind; past-due alone never proves "never delivered".
+     */
+    fun decide(r: Reminder, nowMillis: Long, notificationsEnabled: Boolean): ReminderAction = when {
+        r.state == REMINDER_DELIVERED -> ReminderAction.CLEAR_DELIVERED
+        r.at > nowMillis -> ReminderAction.SCHEDULE
+        notificationsEnabled -> ReminderAction.DELIVER_NOW
+        else -> ReminderAction.KEEP_PENDING
+    }
 }
