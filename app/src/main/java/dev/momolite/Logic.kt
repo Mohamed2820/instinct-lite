@@ -62,3 +62,34 @@ object ReminderPlan {
         else -> ReminderAction.KEEP_PENDING
     }
 }
+
+/** Builds the Cloudflare Workers AI request. Pure string work so it is unit-testable. */
+object CloudflareRequest {
+    const val MODEL = "@cf/meta/llama-3.1-8b-instruct"
+
+    fun endpoint(accountId: String): String =
+        "https://api.cloudflare.com/client/v4/accounts/$accountId/ai/run/$MODEL"
+
+    /** Body carries only the current message text: no history, no files, no metadata. */
+    fun payload(userText: String): String =
+        "{\"messages\":[{\"role\":\"user\",\"content\":${quote(userText)}}]}"
+
+    private fun quote(s: String): String {
+        val out = StringBuilder("\"")
+        for (c in s) when (c) {
+            '"' -> out.append("\\\"")
+            '\\' -> out.append("\\\\")
+            '\n' -> out.append("\\n")
+            '\r' -> out.append("\\r")
+            '\t' -> out.append("\\t")
+            else -> if (c < ' ') out.append("\\u%04x".format(c.code)) else out.append(c)
+        }
+        return out.append('"').toString()
+    }
+}
+
+/** Whether the live provider may be used: explicit opt-in AND stored credentials. */
+object ProviderChoice {
+    fun useCloudflare(enabled: Boolean, hasToken: Boolean, hasAccountId: Boolean): Boolean =
+        enabled && hasToken && hasAccountId
+}
