@@ -1,6 +1,8 @@
 package dev.momolite
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -66,6 +68,31 @@ class LogicTest {
         val leftover = Reminder(4, "d", 500L, state = REMINDER_DELIVERED)
         assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = true))
         assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = false))
+    }
+
+    @Test fun cloudflareEndpointCarriesAccountAndModel() {
+        assertEquals(
+            "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/meta/llama-3.1-8b-instruct",
+            CloudflareRequest.endpoint("acc123"))
+    }
+
+    @Test fun cloudflarePayloadCarriesOnlyCurrentMessage() {
+        val p = CloudflareRequest.payload("قولّي النهارده إيه")
+        assertEquals("{\"messages\":[{\"role\":\"user\",\"content\":\"قولّي النهارده إيه\"}]}", p)
+    }
+
+    @Test fun cloudflarePayloadEscapesQuotesAndNewlines() {
+        val p = CloudflareRequest.payload("a\"b\nc\\d")
+        assertEquals("{\"messages\":[{\"role\":\"user\",\"content\":\"a\\\"b\\nc\\\\d\"}]}", p)
+    }
+
+
+    @Test fun providerStaysOffWithoutExplicitOptIn() {
+        // Credentials alone never enable the provider.
+        assertFalse(ProviderChoice.useCloudflare(enabled = false, hasToken = true, hasAccountId = true))
+        assertFalse(ProviderChoice.useCloudflare(enabled = true, hasToken = false, hasAccountId = true))
+        assertFalse(ProviderChoice.useCloudflare(enabled = true, hasToken = true, hasAccountId = false))
+        assertTrue(ProviderChoice.useCloudflare(enabled = true, hasToken = true, hasAccountId = true))
     }
 
     @Test fun receiverDeliversOnlyWhenNotificationsWork() {
