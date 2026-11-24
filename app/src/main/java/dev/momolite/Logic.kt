@@ -51,6 +51,10 @@ object ReminderPlan {
      * cleared rather than re-fired even when its time is past due, because a crash
      * can leave a delivered row behind; past-due alone never proves "never delivered".
      */
+    /** Receiver decision when an alarm fires: deliver only when a notification can actually be shown. */
+    fun onFire(notificationsEnabled: Boolean): ReminderAction =
+        if (notificationsEnabled) ReminderAction.DELIVER_NOW else ReminderAction.KEEP_PENDING
+
     fun decide(r: Reminder, nowMillis: Long, notificationsEnabled: Boolean): ReminderAction = when {
         r.state == REMINDER_DELIVERED -> ReminderAction.CLEAR_DELIVERED
         r.at > nowMillis -> ReminderAction.SCHEDULE
