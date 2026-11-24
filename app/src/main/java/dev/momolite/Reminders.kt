@@ -62,8 +62,14 @@ object Reminders {
                 ReminderAction.CLEAR_DELIVERED -> { cancel(ctx, r.id); db.deleteReminder(r.id); cleared++ }
             }
         }
+        // Persist the failure count so the app can show it, not just log it.
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt(KEY_SCHEDULE_FAILED, failed).apply()
         return BootReport(scheduled, failed, delivered, kept, cleared)
     }
+
+    private const val PREFS = "reminder_recovery"
+    const val KEY_SCHEDULE_FAILED = "schedule_failed"
 
     private fun pending(ctx: Context, id: Long, text: String): PendingIntent {
         val i = Intent(ctx, ReminderReceiver::class.java).putExtra("id", id).putExtra("text", text)
@@ -97,15 +103,16 @@ class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         val id = intent.getLongExtra("id", 0L)
         val text = intent.getStringExtra("text") ?: return
-        if (!Reminders.notificationsEnabled(ctx)) {
+        if (ReminderPlan.onFire(Reminders.notificationsEnabled(ctx)) == ReminderAction.KEEP_PENDING) {
             // Stay pending: the row remains visible as missed and recovery retries later.
             Log.w(TAG, "reminder $id fired but notifications are blocked; keeping it pending")
             return
         }
         val db = Db(ctx)
         Reminders.notify(ctx, id, text)
-        // Mark before deleting: a crash between the two leaves a delivered row that
-        // recovery clears without re-firing, so a reminder can never be delivered twice.
+        // Mark AFTER posting returns, BEFORE deleting. A crash in this small window can
+        // re-post at recovery, but the stable notification id makes that repost replace
+        // the same notification instead of stacking a second one.
         db.markReminderDelivered(id)
         db.deleteReminder(id)
     }
