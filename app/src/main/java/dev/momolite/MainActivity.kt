@@ -88,9 +88,13 @@ class MainActivity : Activity() {
         input.setText("")
         shown.add(db.addMessage(convId, "user", text))
         if (shown.count { it.role == "user" } == 1) db.renameConversation(convId, Titles.derive(text))
-        val reply = provider.reply(shown)
-        shown.add(db.addMessage(convId, if (reply == null) "system" else "assistant", reply ?: getString(R.string.no_provider)))
         msgAdapter.notifyDataSetChanged()
+        provider.reply(ArrayList(shown)) { reply ->
+            runOnUiThread {
+                shown.add(db.addMessage(convId, if (reply == null) "system" else "assistant", reply ?: getString(R.string.no_provider)))
+                msgAdapter.notifyDataSetChanged()
+            }
+        }
     }
 
     private fun refreshHistory() {
@@ -100,9 +104,13 @@ class MainActivity : Activity() {
         val fmt = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
         lv.adapter = rowAdapter(list.size,
             { i -> list[i].title to fmt.format(Date(list[i].updated)) },
-            { i -> db.deleteConversation(list[i].id)
-                if (list[i].id == convId) openConversation(db.conversations().firstOrNull()?.id ?: db.newConversation(Titles.FALLBACK))
-                refreshHistory() })
+            { i ->
+                val c = list[i]
+                confirmDelete(c.title) {
+                    db.deleteConversation(c.id)
+                    if (c.id == convId) openConversation(db.conversations().firstOrNull()?.id ?: db.newConversation(Titles.FALLBACK))
+                    refreshHistory()
+                } })
         lv.setOnItemClickListener { _, _, i, _ -> openConversation(list[i].id); show(R.id.page_chat) }
     }
 
@@ -113,6 +121,14 @@ class MainActivity : Activity() {
         findViewById<ListView>(R.id.reminders_list).adapter = rowAdapter(list.size,
             { i -> list[i].text to fmt.format(Date(list[i].at)) },
             { i -> Reminders.cancel(this, list[i].id); db.deleteReminder(list[i].id); refreshReminders() })
+    }
+
+    private fun confirmDelete(title: String, onConfirm: () -> Unit) {
+        android.app.AlertDialog.Builder(this)
+            .setMessage(getString(R.string.delete_conversation_confirm, title))
+            .setPositiveButton(R.string.delete) { _, _ -> onConfirm() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun rowAdapter(n: Int, content: (Int) -> Pair<String, String>, onDelete: (Int) -> Unit) = object : BaseAdapter() {
