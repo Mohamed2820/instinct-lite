@@ -87,6 +87,16 @@ class LogicTest {
     }
 
 
+    @Test fun cloudflareClientRepliesNullOfflineWithoutUserMessage() {
+        // No network call is made when there is nothing to send: proves inert behavior offline.
+        var r: String? = "untouched"
+        CloudflareWorkersAi("acc", "tok").reply(emptyList()) { r = it }
+        assertNull(r)
+        var r2: String? = "untouched"
+        CloudflareWorkersAi("acc", "tok").reply(listOf(Msg(1, "assistant", "hi", 1L))) { r2 = it }
+        assertNull(r2)
+    }
+
     @Test fun providerStaysOffWithoutExplicitOptIn() {
         // Credentials alone never enable the provider.
         assertFalse(ProviderChoice.useCloudflare(enabled = false, hasToken = true, hasAccountId = true))
