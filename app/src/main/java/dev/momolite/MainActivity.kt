@@ -97,11 +97,29 @@ class MainActivity : Activity() {
         if (shown.count { it.role == "user" } == 1) db.renameConversation(convId, Titles.derive(text))
         msgAdapter.notifyDataSetChanged()
         val sentConv = convId
-        currentProvider().reply(ArrayList(shown)) { reply ->
+        val enabled = ApiSettings.isEnabled(this)
+        val token = ApiSettings.token(this)
+        val account = ApiSettings.accountId(this)
+        if (!ProviderChoice.useCloudflare(enabled, !token.isNullOrBlank(), !account.isNullOrBlank())) {
+            // Honest non-provider states: turned off, or turned on without saved credentials.
+            shown.add(db.addMessage(convId, "system", getString(if (enabled) R.string.chat_provider_no_key else R.string.no_provider)))
+            msgAdapter.notifyDataSetChanged()
+            return
+        }
+        CloudflareWorkersAi(account!!, token!!).replyDetailed(ArrayList(shown)) { res ->
             runOnUiThread {
                 // A late reply after the conversation was switched or all data was deleted is dropped.
                 if (sentConv != convId) return@runOnUiThread
-                shown.add(db.addMessage(convId, if (reply == null) "system" else "assistant", reply ?: getString(R.string.no_provider)))
+                when (res) {
+                    is ProviderResult.Reply -> shown.add(db.addMessage(convId, "assistant", res.text))
+                    is ProviderResult.Failed -> shown.add(db.addMessage(convId, "system", getString(when (res.kind) {
+                        ProviderError.NETWORK -> R.string.provider_error_network
+                        ProviderError.AUTH -> R.string.provider_error_auth
+                        ProviderError.RATE_LIMIT -> R.string.provider_error_rate
+                        ProviderError.SERVER -> R.string.provider_error_server
+                        ProviderError.BAD_RESPONSE -> R.string.provider_error_badreply
+                    })))
+                }
                 msgAdapter.notifyDataSetChanged()
             }
         }
@@ -199,11 +217,6 @@ class MainActivity : Activity() {
             et.setText(""); refreshReminders()
         }
     }
-
-    private fun currentProvider(): ChatProvider =
-        if (ProviderChoice.useCloudflare(ApiSettings.isEnabled(this), !ApiSettings.token(this).isNullOrBlank(), !ApiSettings.accountId(this).isNullOrBlank()))
-            CloudflareWorkersAi(ApiSettings.accountId(this)!!, ApiSettings.token(this)!!)
-        else NoProvider
 
     private fun setupSettings() {
         findViewById<Button>(R.id.save_settings).setOnClickListener {
