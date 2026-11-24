@@ -96,8 +96,11 @@ class MainActivity : Activity() {
         shown.add(db.addMessage(convId, "user", text))
         if (shown.count { it.role == "user" } == 1) db.renameConversation(convId, Titles.derive(text))
         msgAdapter.notifyDataSetChanged()
+        val sentConv = convId
         currentProvider().reply(ArrayList(shown)) { reply ->
             runOnUiThread {
+                // A late reply after the conversation was switched or all data was deleted is dropped.
+                if (sentConv != convId) return@runOnUiThread
                 shown.add(db.addMessage(convId, if (reply == null) "system" else "assistant", reply ?: getString(R.string.no_provider)))
                 msgAdapter.notifyDataSetChanged()
             }
