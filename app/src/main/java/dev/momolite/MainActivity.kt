@@ -18,7 +18,6 @@ import java.util.Date
 
 class MainActivity : Activity() {
     private lateinit var db: Db
-    private val provider: ChatProvider = NoProvider
     private var convId = 0L
     private val shown = ArrayList<Msg>()
     private lateinit var msgAdapter: BaseAdapter
@@ -52,8 +51,10 @@ class MainActivity : Activity() {
         findViewById<TextView>(R.id.tab_chat).setOnClickListener { show(R.id.page_chat) }
         findViewById<TextView>(R.id.tab_history).setOnClickListener { refreshHistory(); show(R.id.page_history) }
         findViewById<TextView>(R.id.tab_reminders).setOnClickListener { refreshReminders(); show(R.id.page_reminders) }
+        findViewById<TextView>(R.id.tab_settings).setOnClickListener { refreshSettings(); show(R.id.page_settings) }
 
         setupReminders()
+        setupSettings()
         // Opening the app also recovers reminders: re-arms lost alarms and delivers
         // anything missed while the phone was off (kept pending if notifications are blocked).
         val recovery = Reminders.rescheduleAll(this)
@@ -71,10 +72,10 @@ class MainActivity : Activity() {
     }
 
     private fun show(page: Int) {
-        listOf(R.id.page_chat, R.id.page_history, R.id.page_reminders).forEach {
+        listOf(R.id.page_chat, R.id.page_history, R.id.page_reminders, R.id.page_settings).forEach {
             findViewById<View>(it).visibility = if (it == page) View.VISIBLE else View.GONE
         }
-        val tabs = mapOf(R.id.page_chat to R.id.tab_chat, R.id.page_history to R.id.tab_history, R.id.page_reminders to R.id.tab_reminders)
+        val tabs = mapOf(R.id.page_chat to R.id.tab_chat, R.id.page_history to R.id.tab_history, R.id.page_reminders to R.id.tab_reminders, R.id.page_settings to R.id.tab_settings)
         tabs.forEach { (p, t) ->
             val tv = findViewById<TextView>(t)
             tv.setTextColor(if (p == page) Color.parseColor("#1F4E79") else Color.GRAY)
@@ -95,7 +96,7 @@ class MainActivity : Activity() {
         shown.add(db.addMessage(convId, "user", text))
         if (shown.count { it.role == "user" } == 1) db.renameConversation(convId, Titles.derive(text))
         msgAdapter.notifyDataSetChanged()
-        provider.reply(ArrayList(shown)) { reply ->
+        currentProvider().reply(ArrayList(shown)) { reply ->
             runOnUiThread {
                 shown.add(db.addMessage(convId, if (reply == null) "system" else "assistant", reply ?: getString(R.string.no_provider)))
                 msgAdapter.notifyDataSetChanged()
@@ -194,6 +195,52 @@ class MainActivity : Activity() {
             }
             et.setText(""); refreshReminders()
         }
+    }
+
+    private fun currentProvider(): ChatProvider =
+        if (ProviderChoice.useCloudflare(ApiSettings.isEnabled(this), !ApiSettings.token(this).isNullOrBlank(), !ApiSettings.accountId(this).isNullOrBlank()))
+            CloudflareWorkersAi(ApiSettings.accountId(this)!!, ApiSettings.token(this)!!)
+        else NoProvider
+
+    private fun setupSettings() {
+        findViewById<Button>(R.id.save_settings).setOnClickListener {
+            val token = findViewById<EditText>(R.id.settings_token).text.toString().trim()
+            val account = findViewById<EditText>(R.id.settings_account).text.toString().trim()
+            ApiSettings.saveCredentials(this, token, account)
+            findViewById<EditText>(R.id.settings_token).setText("")
+            Toast.makeText(this, R.string.settings_saved, Toast.LENGTH_SHORT).show()
+            refreshSettings()
+        }
+        findViewById<CheckBox>(R.id.enable_provider).setOnCheckedChangeListener { _, on ->
+            ApiSettings.setEnabled(this, on); refreshSettings()
+        }
+        findViewById<Button>(R.id.delete_all_data).setOnClickListener {
+            android.app.AlertDialog.Builder(this)
+                .setMessage(getString(R.string.delete_all_confirm))
+                .setPositiveButton(R.string.delete) { _, _ -> deleteAllData() }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+    }
+
+    private fun refreshSettings() {
+        val enabled = ApiSettings.isEnabled(this)
+        val hasKey = ApiSettings.hasCredentials(this)
+        findViewById<CheckBox>(R.id.enable_provider).isChecked = enabled
+        findViewById<TextView>(R.id.settings_status).text = getString(when {
+            !enabled -> R.string.settings_status_off
+            !hasKey -> R.string.settings_status_no_key
+            else -> R.string.settings_status_on
+        })
+    }
+
+    private fun deleteAllData() {
+        db.reminders().forEach { Reminders.cancel(this, it.id) }
+        db.clearAll()
+        ApiSettings.clear(this)
+        openConversation(db.newConversation(Titles.FALLBACK))
+        refreshSettings()
+        Toast.makeText(this, R.string.delete_all_done, Toast.LENGTH_LONG).show()
     }
 
     companion object { private const val REQ_NOTIFICATIONS = 1 }
