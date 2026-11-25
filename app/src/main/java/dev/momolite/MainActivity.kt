@@ -179,7 +179,7 @@ class MainActivity : AppCompatActivity() {
         pending = handle
         syncChatUi()
         worker.execute {
-            val res = ProviderClient().send(config!!, text, handle)
+            val res = clientFactory().send(config!!, text, handle)
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 if (pending === handle) pending = null
@@ -336,17 +336,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun testConnection() {
-        val stored = ApiSettings.config(this)
-        val typed = text(R.id.settings_key)
-        val cfg = ProviderConfig(selectedType(), typed.ifBlank { stored?.apiKey.orEmpty() }, text(R.id.settings_model),
-            text(R.id.settings_account), text(R.id.settings_address))
+        val key = ApiSettings.keyForTest(this, selectedType(), text(R.id.settings_key), text(R.id.settings_account), text(R.id.settings_address))
+        val cfg = ProviderConfig(selectedType(), key, text(R.id.settings_model), text(R.id.settings_account), text(R.id.settings_address))
         val result = findViewById<TextView>(R.id.test_result)
         result.visibility = View.VISIBLE
         val missing = ProviderChoice.missing(cfg)
         if (missing.isNotEmpty()) { result.text = getString(R.string.settings_status_incomplete, missingText(missing)); return }
         result.setText(R.string.settings_testing)
         worker.execute {
-            val res = ProviderClient().send(cfg, ProviderClient.TEST_PROMPT)
+            val res = clientFactory().send(cfg, ProviderClient.TEST_PROMPT)
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 result.text = if (res is ProviderResult.Reply) getString(R.string.settings_test_ok)
@@ -398,5 +396,9 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.delete_all_done, Toast.LENGTH_LONG).show()
     }
 
-    companion object { private const val REQ_NOTIFICATIONS = 1 }
+    companion object {
+        private const val REQ_NOTIFICATIONS = 1
+        /** Test seam: lets tests supply a fake transport. The app always uses the real one. */
+        @Volatile internal var clientFactory: () -> ProviderClient = { ProviderClient() }
+    }
 }

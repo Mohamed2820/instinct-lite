@@ -200,3 +200,17 @@ object ProviderErrors {
         return "4006" in b || "insufficient_quota" in b || "free allocation" in b || "quota" in b || "billing" in b
     }
 }
+
+
+/** Decides whether a stored key may be reused. A key belongs to one destination (type + address/account). */
+object KeyBinding {
+    fun destination(type: ProviderType, address: String, accountId: String): String =
+        type.name + "|" + (if (type == ProviderType.CLOUDFLARE) accountId.trim() else address.trim().trimEnd('/').lowercase())
+
+    /** The key to use: the typed one, else the stored one only if the destination is unchanged. */
+    fun resolve(typedKey: String, storedKey: String, storedDestination: String?, newDestination: String): String = when {
+        typedKey.isNotBlank() -> typedKey.trim()
+        storedKey.isNotBlank() && storedDestination == newDestination -> storedKey
+        else -> ""
+    }
+}
