@@ -1,52 +1,59 @@
 # instinct-lite
 
-A small, free, open-source Android assistant app with an Arabic (RTL) chat screen, saved conversations and local reminders.
+تطبيق أندرويد مفتوح المصدر ومجاني: مساعد شخصي بسيط بالعربي (RTL) فيه شات، محادثات محفوظة على الجهاز، وتذكيرات محلية.
 
-**Independent project.** instinct-lite is written from scratch by its author. It is not affiliated with, endorsed by, or derived from any commercial assistant product, and it contains none of their code, prompts or assets.
+**مشروع مستقل.** instinct-lite مكتوب من الصفر على إيد صاحبه. مش تابع لأي منتج مساعد تجاري ولا مشتق منه ولا فيه أي كود أو أصول منه.
 
-## Status (v0.3.0)
+## الحالة (الإصدار 1.0.0، versionCode 6)
 
-| Feature | State |
+| الميزة | الحالة |
 | --- | --- |
-| Arabic RTL chat UI | Built |
-| Conversations saved on the device (SQLite) | Built |
-| Local reminders with a notification | Built |
-| AI replies | **Not connected.** No model provider is wired in yet, so the app says so instead of faking an answer. |
-| Reminder validation + error messages | Built (empty text, past time, notifications permission denied, alarm refused) |
-| Logic unit tests | 10 tests, run on every GitHub build |
-| Missed reminders (phone off) | Delivered on next boot instead of dropped |
-| Conversation delete | Asks before erasing messages |
-| Arabic RTL layout | Verified with layout renders of all three screens (renders, not on-device tests) |
+| شات عربي RTL، فقاعات رسائل، وضع داكن تلقائي، شاشة ترحيب وشاشات فاضية | مكتوب ومتبني |
+| محادثات محفوظة (SQLite)، فتح/حذف بتأكيد | مكتوب، ومنطق الحذف والترقية متجرّب بالكود |
+| تذكيرات: إشعارات، إعادة التشغيل، رفض إذن الإشعارات | مكتوب، ومنطق القرارات متجرّب بالكود. **التجربة على جهاز حقيقي لسه ماحصلتش** |
+| مزوّد الذكاء: OpenAI-compatible / Cloudflare Workers AI / عنوان مخصص + زر اختبار الاتصال | مكتوب، ومتجرّب بكود ضد شبكة مزيّفة. **ماجرّبناش مزوّد حقيقي** |
+| مفتاح الـ API مشفّر على الجهاز | مكتوب. **التشفير الفعلي على الجهاز (Keystore) لسه ماتجرّبش** |
+| معالجة الأخطاء: نت، حد مجاني خلص، مفتاح غلط، رد فاضي، timeout، إلغاء | مكتوب ومتجرّب بالكود |
+| زر «حذف كل بياناتي» وشاشة الخصوصية | مكتوب |
 
-Everything is stored on the device. The app has no internet permission and sends nothing anywhere.
+بالتفصيل في `docs/KNOWN_ISSUES.md`.
 
-## Get the APK
+## التثبيت
 
-The APK is built by GitHub Actions, not on your phone.
+الـ APK بيتبني على GitHub Actions، مش على موبايلك.
 
-1. Open the **Actions** tab, pick the latest successful **Build APK** run.
-2. Download the artifact named `instinct-lite-debug-apk-run-<number>` for that run and unzip it.
-3. Install `app-debug.apk` on your Android phone (allow "install unknown apps" for your browser or file manager once).
+1. افتح تبويب **Actions** > **Build APK** > **Run workflow** واختار `debug` (أو `release` بعد ما تظبط التوقيع، شوف `docs/SIGNING.md`).
+2. بعد ما يخلص، نزّل الـ artifact واتأكد من الـ SHA-256 قبل التثبيت.
+3. فك الضغط وثبّت `instinct-lite-<النسخة>-debug.apk`. أندرويد 7.0 (API 24) أو أحدث. هتحتاج تسمح بـ «تثبيت تطبيقات من مصادر غير معروفة» للمتصفح أو مدير الملفات مرة واحدة.
 
-This is a debug-signed build for sideloading. Android 7.0 (API 24) or newer. A stable release key is planned but not set up yet; see `docs/SIGNING.md`.
+## التحديث
 
-## Build it yourself
+ثبّت APK أحدث فوق القديم. التحديث بينجح بس لو **نفس مفتاح التوقيع**. نسخة debug ونسخة release بمفاتيح مختلفة، فمش بيتحدّثوا فوق بعض: لو بدّلت بينهم لازم تحذف القديم الأول (وده بيمسح بياناته).
 
-You need JDK 17, the Android SDK (platform 34) and Gradle 8.7:
+## الإعداد (مزوّد الذكاء)
+
+من غير مفتاح التطبيق بيقول صراحة إن مفيش مزوّد. إنت بتدخّل مفتاحك بنفسك:
+
+1. الإعدادات > اختار نوع المزوّد.
+2. اكتب العنوان (https بس) واسم النموذج والمفتاح (ومعرّف الحساب لو Cloudflare).
+3. اضغط «احفظ» ثم فعّل المزوّد ثم «اختبار الاتصال». الاختبار بيبعت كلمة «ping» بس.
+
+## الخصوصية
+
+شوف `PRIVACY.md`. باختصار: المحادثات والتذكيرات على جهازك بس، ومفيش حسابات ولا تتبع. لو فعّلت مزوّد، نص رسالتك الحالية بس بيروح له.
+
+## البناء بنفسك
+
+JDK 17 وAndroid SDK 34 وGradle 8.7:
 
 ```
-gradle assembleDebug     # build the APK into app/build/outputs/apk/debug/
-gradle testDebugUnitTest # run the logic tests
+gradle testDebugUnitTest lintDebug assembleDebug
 ```
 
-## Privacy
+## الاختبارات
 
-See `PRIVACY.md`. Short version: everything stays on the device, the app has no internet permission.
+اختبارات الوحدة بتشتغل على JVM عادي (من غير موبايل): منطق التذكيرات، بناء الطلبات وتحليل الردود وتصنيف الأخطاء بشبكة مزيّفة، ترقية قاعدة البيانات على SQLite حقيقي، واختبارات حماية للأمان (manifest، الصلاحيات، منع تسريب الأسرار في الكود). اختبارات التشغيل على جهاز حقيقي مش موجودة لسه.
 
-## Adding an AI provider
+## الرخصة
 
-Replies come through the `ChatProvider` interface in `app/src/main/java/dev/momolite/ChatProvider.kt`. The contract is already asynchronous, so a network provider can plug in without changing the UI; implement it and set it in `MainActivity`. If you add one that needs an API key, keep the key on the device (never in the repository) and add the `INTERNET` permission yourself.
-
-## License
-
-MIT. See `LICENSE`.
+MIT. شوف `LICENSE`. خط Tajawal مرخّص تحت SIL Open Font License (`app/src/main/res/font/OFL.txt`).

@@ -1,33 +1,27 @@
-# Signing plan (not set up yet)
+# التوقيع (مفتاح الإصدار الثابت)
 
-The APK currently builds with the Android debug key so it can be sideloaded.
-Before any public release, the app needs a stable release key.
+**الحالة: الكود جاهز، لكن المفتاح لسه ماتولّدش.** تشغيل الخطوات تحت محتاج منك إنت بإيدك (ماتعملش أي حاجة بالنيابة عنك).
 
-Why the key matters:
+## ليه الخطوات دي بالشكل ده (حقايق من وثائق GitHub)
 
-- Android refuses an ordinary in-place update when the new APK is signed with
-  a DIFFERENT certificate than the installed one. That is a fact to plan
-  around, not a problem to work around: do not uninstall an installed copy to
-  get past a certificate mismatch, and never uninstall the app as a casual
-  troubleshooting step. All conversations and reminders live in app-private
-  storage, and uninstalling permanently deletes them.
-- Once a stable release key exists and builds are signed with it, Android
-  permits same-key updates to install over the top. That does not guarantee
-  data survives every upgrade: application or schema bugs can still lose
-  data, and data preservation across upgrades has not been tested yet.
-- Whether any build is already installed on a device, and which certificate
-  it carries, is currently unknown.
+- الـ workflow بالـ token الافتراضي **مش بيقدر يكتب Secrets**. إضافة Secret بتتم بإيدك من إعدادات الريبو.
+- ريبو عام = أي حد عنده حساب GitHub يقدر ينزّل الـ artifacts. فملف المفتاح محمي بالباسورد بتاعك بس، ولازم يكون طويل وعشوائي (16 حرف على الأقل، الأفضل 24+).
+- المفتاح مابينزلش في الريبو ولا في الشات. وماتفقدوش: لو ضاع، التحديثات فوق النسخ المثبتة مش هتشتغل.
 
-Planned setup, pending Mohamed's approval (creates a key, so it waits):
+## الخطوات (من الموبايل، من متصفح GitHub، ممكن تحتاج «موقع سطح المكتب»)
 
-1. Generate one release keystore locally (`keytool -genkeypair`). The
-   original file and its backup stay in private storage chosen by Mohamed
-   (never in the repository, never sent over chat). Losing the key means
-   updates can never install over older installs again.
-2. Store the keystore (base64) and its passwords in GitHub **Secrets**, never
-   in the repository. `.gitignore` already blocks `*.jks`, `*.keystore` and
-   `keystore.properties`.
-3. Add a release signing config to the workflow that only activates when
-   those secrets exist.
+1. الريبو > **Settings** > **Secrets and variables** > **Actions** > **New repository secret**.
+2. اعمل Secret اسمه `SIGNING_KEYSTORE_PASSWORD` وقيمته باسورد طويل وعشوائي إنت اخترته (احفظه في مدير باسوردات عندك). ماتكتبوش في الشات.
+3. **Actions** > **Generate signing keystore (run once)** > **Run workflow**، واكتب `YES` في الخانة.
+4. لما يخلص، افتح الـ run ونزّل الـ artifact `signing-keystore-DELETE-AFTER-DOWNLOAD`. احفظ الملفات في مكان آمن عندك.
+5. افتح `SIGNING_KEYSTORE_BASE64.txt`، انسخ النص كله، واعمل Secret جديد اسمه `SIGNING_KEYSTORE_BASE64` والصق النص.
+6. اعمل Secret تالت `SIGNING_KEY_ALIAS` وقيمته `instinct-lite`.
+7. امسح الـ artifact من صفحة الـ run (سلة المهملات)، عشان ماينفضلش متاح.
+8. **Actions** > **Build APK** > **Run workflow** > `build_type = release`. الـ workflow بيفشل برسالة واضحة لو أي Secret ناقص، ومابيوقّعش أبدًا بمفتاح debug.
+9. قارن بصمة الشهادة في `signature.txt` (في artifact البناء) مع `certificate-fingerprint.txt` اللي حفظتهم.
 
-Nothing on this page has been done yet. No key exists in the repo or in CI.
+## ملاحظات
+
+- البناء العادي (`debug`) مابيستخدمش أي Secret.
+- تشغيل خطوة 3 مرة تانية بيولّد مفتاح **مختلف**. اتعمل مرة واحدة بس.
+- نسخة debug ونسخة release بمفاتيح مختلفة: مش بتتحدّث فوق بعض.

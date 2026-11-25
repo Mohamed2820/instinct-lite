@@ -1,13 +1,12 @@
-# Privacy
+# سياسة الخصوصية (الإصدار 1.0.0)
 
-As of v0.2.0:
-
-- Everything (conversations, reminders) is stored in a local SQLite database on
-  the device. Nothing is sent anywhere: the app does not request the
-  `INTERNET` permission.
-- No analytics, no ads, no tracking, no accounts.
-- `allowBackup` is off, so chats are not uploaded to any cloud backup.
-
-When an AI provider is connected later (Mohamed chooses which one), chat
-messages will be sent to that provider to generate replies. That change will be
-called out in the README and in the app before it ships.
+- المحادثات والتذكيرات متخزّنة في قاعدة SQLite محلية على جهازك بس.
+- مفيش حسابات ولا إعلانات ولا إحصائيات ولا تتبع.
+- التطبيق بيطلب صلاحية الإنترنت عشان المزوّد اللي إنت تختاره **بس**. من غير مزوّد مفعّل ومفتاح محفوظ، مفيش أي اتصال بيتعمل.
+- لو فعّلت مزوّد: نص رسالتك الحالية بس بيتبعت له (من غير باقي المحادثة ومن غير ملفات) عبر HTTPS، ومعاه المفتاح في رأس Authorization. مزوّدك ليه سياسة خصوصية خاصة بيه.
+- زر «اختبار الاتصال» بيبعت كلمة «ping» بس.
+- مفتاح الـ API متخزّن مشفّر (EncryptedSharedPreferences على Android Keystore)، مش بيتكتب في سجلات ولا ملفات تانية، ومش بيظهر في لقطات الشاشة وإنت في شاشة الإعدادات.
+- التطبيق مابيتّبعش إعادة توجيه (redirect) عشان المفتاح مايروحش لعنوان تاني.
+- النسخ الاحتياطي التلقائي مقفول (`allowBackup=false` وقواعد استخراج البيانات).
+- «حذف كل بياناتي» بيمسح المحادثات والتذكيرات والإعدادات والمفتاح من الجهاز.
+- التذكيرات بتستخدم منبّه ونظام إشعارات الجهاز بس، وبتتسجّل تاني بعد إعادة التشغيل.

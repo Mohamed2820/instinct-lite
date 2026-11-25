@@ -91,8 +91,9 @@ object Reminders {
                 NotificationChannel(CHANNEL, ctx.getString(R.string.reminder_channel), NotificationManager.IMPORTANCE_HIGH))
         }
         val open = PendingIntent.getActivity(ctx, 0, Intent(ctx, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        @Suppress("DEPRECATION")
         val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(ctx, CHANNEL) else Notification.Builder(ctx)
-        val n = b.setSmallIcon(android.R.drawable.ic_popup_reminder)
+        val n = b.setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(ctx.getString(R.string.reminder_title))
             .setContentText(text).setContentIntent(open).setAutoCancel(true).build()
         nm.notify(id.toInt(), n)

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_teal">#0F766E</color>
+    <color name="brand_teal_dark">#0B3F3B</color>
+    <color name="brand_amber">#F59E0B</color>
+    <color name="icon_bg">#0F766E</color>
+    <color name="icon_fg">#FFFFFF</color>
+</resources>

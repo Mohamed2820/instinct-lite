@@ -9,3 +9,9 @@ local.properties
 *.jks
 keystore.properties
 .DS_Store
+
+*.jks
+*.p12
+*.keystore
+deps.txt
+osv-report.txt

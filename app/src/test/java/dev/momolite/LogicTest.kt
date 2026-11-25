@@ -1,142 +1,133 @@
 package dev.momolite
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Assert.assertNull
+import org.junit.Assert.*
 import org.junit.Test
 
 class LogicTest {
     private val now = 1_000_000L
 
-    @Test fun blankReminderIsRejected() {
-        assertEquals(ReminderError.EMPTY_TEXT, ReminderRules.validate("", now + 60_000, now))
-        assertEquals(ReminderError.EMPTY_TEXT, ReminderRules.validate("   ", now + 60_000, now))
+    // ---- reminders ----
+    @Test fun blankReminderIsRejected() = assertEquals(ReminderError.EMPTY_TEXT, ReminderRules.validate("   ", now + 1, now))
+    @Test fun pastReminderIsRejected() = assertEquals(ReminderError.TIME_IN_PAST, ReminderRules.validate("x", now - 1, now))
+    @Test fun reminderAtExactlyNowIsPast() = assertEquals(ReminderError.TIME_IN_PAST, ReminderRules.validate("x", now, now))
+    @Test fun futureReminderIsAccepted() = assertNull(ReminderRules.validate("x", now + 1, now))
+    @Test fun reminderTextIsTrimmedAndCapped() {
+        assertEquals("a", ReminderRules.clean("  a  "))
+        assertEquals(ReminderRules.MAX_TEXT, ReminderRules.clean("x".repeat(500)).length)
     }
 
-    @Test fun pastReminderIsRejected() {
-        assertEquals(ReminderError.TIME_IN_PAST, ReminderRules.validate("مذاكرة", now - 1, now))
-        assertEquals(ReminderError.TIME_IN_PAST, ReminderRules.validate("مذاكرة", now, now))
-    }
-
-    @Test fun futureReminderIsAccepted() {
-        assertNull(ReminderRules.validate("مذاكرة", now + 60_000, now))
-    }
-
-    @Test fun titleComesFromFirstMessageTrimmed() {
-        assertEquals("أهلا", Titles.derive("  أهلا  "))
-    }
-
-    @Test fun longTitleIsCapped() {
-        assertEquals(Titles.MAX_LEN, Titles.derive("ا".repeat(200)).length)
-    }
-
-    @Test fun emptyTitleFallsBack() {
-        assertEquals(Titles.FALLBACK, Titles.derive("   "))
-    }
-
-    @Test fun noProviderCallsBackWithNull() {
-        var seen: String? = "unset"
-        NoProvider.reply(listOf(Msg(1, "user", "أهلا", 0))) { seen = it }
-        assertNull(seen)
-    }
-
-    @Test fun futurePendingReminderIsScheduled() {
-        val future = Reminder(1, "a", 2_000L)
-        assertEquals(ReminderAction.SCHEDULE, ReminderPlan.decide(future, 1_000L, notificationsEnabled = true))
-        assertEquals(ReminderAction.SCHEDULE, ReminderPlan.decide(future, 1_000L, notificationsEnabled = false))
-    }
-
-    @Test fun pastDuePendingReminderFiresWhenNotificationsWork() {
-        val past = Reminder(2, "b", 500L)
-        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.decide(past, 1_000L, notificationsEnabled = true))
-    }
-
-    @Test fun pastDuePendingReminderIsKeptWhenNotificationsBlocked() {
-        val past = Reminder(2, "b", 500L)
-        // The row must survive: blocked notifications never silently delete a reminder.
-        assertEquals(ReminderAction.KEEP_PENDING, ReminderPlan.decide(past, 1_000L, notificationsEnabled = false))
-    }
-
-    @Test fun boundaryReminderCountsAsPastDue() {
-        val edge = Reminder(3, "c", 1_000L)
-        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.decide(edge, 1_000L, notificationsEnabled = true))
-    }
-
+    @Test fun futurePendingReminderIsScheduled() =
+        assertEquals(ReminderAction.SCHEDULE, ReminderPlan.decide(Reminder(1, "a", now + 5), now, true))
+    @Test fun futureReminderIsScheduledEvenWhenNotificationsBlocked() =
+        assertEquals(ReminderAction.SCHEDULE, ReminderPlan.decide(Reminder(1, "a", now + 5), now, false))
+    @Test fun pastDuePendingFiresWhenNotificationsWork() =
+        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.decide(Reminder(1, "a", now - 5), now, true))
+    @Test fun pastDuePendingIsKeptWhenNotificationsBlocked() =
+        assertEquals(ReminderAction.KEEP_PENDING, ReminderPlan.decide(Reminder(1, "a", now - 5), now, false))
+    @Test fun boundaryReminderCountsAsPastDue() =
+        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.decide(Reminder(1, "a", now), now, true))
     @Test fun deliveredReminderIsClearedNotRefired() {
-        // Crash left a delivered row behind: past-due alone never proves "never delivered".
-        val leftover = Reminder(4, "d", 500L, state = REMINDER_DELIVERED)
-        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = true))
-        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(leftover, 1_000L, notificationsEnabled = false))
+        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(Reminder(1, "a", now - 5, REMINDER_DELIVERED), now, true))
+        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(Reminder(1, "a", now + 5, REMINDER_DELIVERED), now, false))
     }
-
-    @Test fun cloudflareEndpointCarriesAccountAndModel() {
-        assertEquals(
-            "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/meta/llama-3.1-8b-instruct",
-            CloudflareRequest.endpoint("acc123"))
-    }
-
-    @Test fun cloudflarePayloadCarriesOnlyCurrentMessage() {
-        val p = CloudflareRequest.payload("قولّي النهارده إيه")
-        assertEquals("{\"messages\":[{\"role\":\"user\",\"content\":\"قولّي النهارده إيه\"}]}", p)
-    }
-
-    @Test fun cloudflarePayloadEscapesQuotesAndNewlines() {
-        val p = CloudflareRequest.payload("a\"b\nc\\d")
-        assertEquals("{\"messages\":[{\"role\":\"user\",\"content\":\"a\\\"b\\nc\\\\d\"}]}", p)
-    }
-
-
-    @Test fun cloudflareClientRepliesNullOfflineWithoutUserMessage() {
-        // No network call is made when there is nothing to send: proves inert behavior offline.
-        var r: String? = "untouched"
-        CloudflareWorkersAi("acc", "tok").reply(emptyList()) { r = it }
-        assertNull(r)
-        var r2: String? = "untouched"
-        CloudflareWorkersAi("acc", "tok").reply(listOf(Msg(1, "assistant", "hi", 1L))) { r2 = it }
-        assertNull(r2)
-    }
-
-    @Test fun httpErrorMappingIsHonestAndSecretFree() {
-        assertEquals(ProviderError.AUTH, ProviderErrors.fromHttpCode(401))
-        assertEquals(ProviderError.AUTH, ProviderErrors.fromHttpCode(403))
-        assertEquals(ProviderError.RATE_LIMIT, ProviderErrors.fromHttpCode(429))
-        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttpCode(500))
-        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttpCode(503))
-        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttpCode(400))
-    }
-
-    @Test fun cloudflareDetailedFailureWithoutUserMessageIsClassified() {
-        // No network call is made when there is nothing to send; failure is classified, not silent.
-        var r: ProviderResult? = null
-        CloudflareWorkersAi("acc", "tok").replyDetailed(emptyList()) { r = it }
-        assertEquals(ProviderResult.Failed(ProviderError.BAD_RESPONSE), r)
-        var r2: ProviderResult? = null
-        CloudflareWorkersAi("acc", "tok").replyDetailed(listOf(Msg(1, "assistant", "hi", 1L))) { r2 = it }
-        assertEquals(ProviderResult.Failed(ProviderError.BAD_RESPONSE), r2)
-    }
-
-    @Test fun failureKindsCarryNoSecrets() {
-        // The failure type has no payload/token field at all: nothing secret can leak into a bubble.
-        val f: ProviderResult = ProviderResult.Failed(ProviderError.AUTH)
-        assertEquals("Failed(kind=AUTH)", f.toString())
-    }
-
-    @Test fun providerStaysOffWithoutExplicitOptIn() {
-        // Credentials alone never enable the provider.
-        assertFalse(ProviderChoice.useCloudflare(enabled = false, hasToken = true, hasAccountId = true))
-        assertFalse(ProviderChoice.useCloudflare(enabled = true, hasToken = false, hasAccountId = true))
-        assertFalse(ProviderChoice.useCloudflare(enabled = true, hasToken = true, hasAccountId = false))
-        assertTrue(ProviderChoice.useCloudflare(enabled = true, hasToken = true, hasAccountId = true))
-    }
-
     @Test fun receiverDeliversOnlyWhenNotificationsWork() {
-        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.onFire(notificationsEnabled = true))
-        assertEquals(ReminderAction.KEEP_PENDING, ReminderPlan.onFire(notificationsEnabled = false))
+        assertEquals(ReminderAction.DELIVER_NOW, ReminderPlan.onFire(true))
+        assertEquals(ReminderAction.KEEP_PENDING, ReminderPlan.onFire(false))
+    }
+    @Test fun bootRecoveryMixedBatchIsDecidedPerReminder() {
+        val batch = listOf(
+            Reminder(1, "future", now + 100), Reminder(2, "missed", now - 100),
+            Reminder(3, "done", now - 50, REMINDER_DELIVERED), Reminder(4, "future2", now + 1))
+        val granted = batch.map { ReminderPlan.decide(it, now, true) }
+        assertEquals(listOf(ReminderAction.SCHEDULE, ReminderAction.DELIVER_NOW, ReminderAction.CLEAR_DELIVERED, ReminderAction.SCHEDULE), granted)
+        val denied = batch.map { ReminderPlan.decide(it, now, false) }
+        assertEquals(listOf(ReminderAction.SCHEDULE, ReminderAction.KEEP_PENDING, ReminderAction.CLEAR_DELIVERED, ReminderAction.SCHEDULE), denied)
     }
 
-    @Test fun deliveredReminderIsClearedEvenWhenItsTimeIsStillFuture() {
-        val weird = Reminder(5, "e", 9_000L, state = REMINDER_DELIVERED)
-        assertEquals(ReminderAction.CLEAR_DELIVERED, ReminderPlan.decide(weird, 1_000L, notificationsEnabled = true))
+    // ---- titles ----
+    @Test fun titleComesFromFirstLineTrimmed() = assertEquals("hello", Titles.derive("  hello \nsecond line"))
+    @Test fun longTitleIsCapped() = assertEquals(Titles.MAX_LEN, Titles.derive("x".repeat(200)).length)
+    @Test fun emptyTitleFallsBack() { assertEquals(Titles.FALLBACK, Titles.derive("   ")); assertEquals(Titles.FALLBACK, Titles.derive("\n\n")) }
+
+    // ---- url rules ----
+    @Test fun onlyHttpsHostsAreAccepted() {
+        assertTrue(UrlRules.isSecureHttps("https://api.example.com/v1"))
+        assertFalse(UrlRules.isSecureHttps("http://api.example.com/v1"))
+        assertFalse(UrlRules.isSecureHttps("ftp://x.com"))
+        assertFalse(UrlRules.isSecureHttps("https://"))
+        assertFalse(UrlRules.isSecureHttps("not a url"))
+        assertFalse(UrlRules.isSecureHttps(""))
+    }
+    @Test fun addressesWithEmbeddedCredentialsAreRejected() = assertFalse(UrlRules.isSecureHttps("https://user:pw@evil.example.com/"))
+
+    // ---- config completeness and the provider gate ----
+    private fun openai(key: String = "k", model: String = "m", addr: String = "https://api.openai.com/v1") =
+        ProviderConfig(ProviderType.OPENAI_COMPATIBLE, key, model, address = addr)
+
+    @Test fun completeOpenAiConfigHasNothingMissing() = assertTrue(ProviderChoice.missing(openai()).isEmpty())
+    @Test fun missingKeyAndModelAreReported() =
+        assertEquals(listOf(MissingField.KEY, MissingField.MODEL), ProviderChoice.missing(openai(key = " ", model = "")))
+    @Test fun httpAddressIsReportedAsNotHttps() =
+        assertEquals(listOf(MissingField.ADDRESS_NOT_HTTPS), ProviderChoice.missing(openai(addr = "http://x.com")))
+    @Test fun cloudflareNeedsAccountIdAlphanumeric() {
+        val ok = ProviderConfig(ProviderType.CLOUDFLARE, "k", ProviderChoice.DEFAULT_CF_MODEL, accountId = "abc123")
+        assertTrue(ProviderChoice.missing(ok).isEmpty())
+        assertEquals(listOf(MissingField.ACCOUNT_ID), ProviderChoice.missing(ok.copy(accountId = "")))
+        assertEquals(listOf(MissingField.ACCOUNT_ID), ProviderChoice.missing(ok.copy(accountId = "../evil")))
+    }
+    @Test fun providerStaysOffWithoutOptIn() {
+        assertEquals(ProviderState.OFF, ProviderGate.state(false, openai()))
+        assertEquals(ProviderState.OFF, ProviderGate.state(false, null))
+    }
+    @Test fun enabledWithoutCompleteConfigIsIncomplete() {
+        assertEquals(ProviderState.INCOMPLETE, ProviderGate.state(true, null))
+        assertEquals(ProviderState.INCOMPLETE, ProviderGate.state(true, openai(key = "")))
+    }
+    @Test fun enabledAndCompleteIsReady() = assertEquals(ProviderState.READY, ProviderGate.state(true, openai()))
+    @Test fun configToStringNeverContainsTheKey() {
+        val s = openai(key = "sk-SECRET-123").toString()
+        assertFalse(s.contains("SECRET"))
+        assertTrue(s.contains("set"))
+    }
+    @Test fun providerTypeParsingFallsBackSafely() {
+        assertEquals(ProviderType.CLOUDFLARE, ProviderType.parse("CLOUDFLARE"))
+        assertEquals(ProviderType.OPENAI_COMPATIBLE, ProviderType.parse("junk"))
+        assertEquals(ProviderType.OPENAI_COMPATIBLE, ProviderType.parse(null))
+    }
+
+    // ---- request builder ----
+    @Test fun openAiRequestShape() {
+        val r = RequestBuilder.build(openai(addr = "https://host.example/v1/"), "مرحبا \"x\"\n")
+        assertEquals("https://host.example/v1/chat/completions", r.url)
+        assertEquals("Bearer k", r.headers["Authorization"])
+        assertEquals("{\"model\":\"m\",\"messages\":[{\"role\":\"user\",\"content\":\"مرحبا \\\"x\\\"\\n\"}]}", r.body)
+    }
+    @Test fun customAddressIsUsedAsIs() {
+        val c = ProviderConfig(ProviderType.CUSTOM, "k", "m", address = "https://host.example/custom/endpoint")
+        assertEquals("https://host.example/custom/endpoint", RequestBuilder.build(c, "hi").url)
+    }
+    @Test fun cloudflareRequestShape() {
+        val c = ProviderConfig(ProviderType.CLOUDFLARE, "k", "@cf/meta/llama-3.1-8b-instruct", accountId = "acc1")
+        val r = RequestBuilder.build(c, "hi")
+        assertEquals("https://api.cloudflare.com/client/v4/accounts/acc1/ai/run/@cf/meta/llama-3.1-8b-instruct", r.url)
+        assertEquals("{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}", r.body)
+    }
+    @Test fun payloadCarriesOnlyTheCurrentMessage() {
+        val body = RequestBuilder.build(openai(), "only this").body
+        assertEquals(1, Regex("\"role\"").findAll(body).count())
+    }
+    @Test fun controlCharactersAreEscaped() = assertEquals("\"\\u0001\"", Json.quote("\u0001"))
+
+    // ---- http error mapping ----
+    @Test fun httpMappingIsHonest() {
+        assertEquals(ProviderError.AUTH, ProviderErrors.fromHttp(401))
+        assertEquals(ProviderError.AUTH, ProviderErrors.fromHttp(403))
+        assertEquals(ProviderError.QUOTA, ProviderErrors.fromHttp(402))
+        assertEquals(ProviderError.RATE_LIMIT, ProviderErrors.fromHttp(429, "{\"error\":\"slow down\"}"))
+        assertEquals(ProviderError.QUOTA, ProviderErrors.fromHttp(429, "{\"errors\":[{\"code\":4006}]}"))
+        assertEquals(ProviderError.QUOTA, ProviderErrors.fromHttp(429, "{\"error\":{\"code\":\"insufficient_quota\"}}"))
+        assertEquals(ProviderError.SERVER, ProviderErrors.fromHttp(503))
+        assertEquals(ProviderError.BAD_RESPONSE, ProviderErrors.fromHttp(404))
+        assertEquals(ProviderError.BAD_RESPONSE, ProviderErrors.fromHttp(302))
     }
 }

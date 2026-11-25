@@ -13,14 +13,12 @@ const val REMINDER_DELIVERED = "delivered"
 data class Reminder(val id: Long, val text: String, val at: Long, val state: String = REMINDER_PENDING)
 
 /** Local SQLite storage. Nothing leaves the device. */
-class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 2) {
+class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, Schema.VERSION) {
     override fun onCreate(db: SQLiteDatabase) {
-        db.execSQL("CREATE TABLE conversations(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, updated INTEGER NOT NULL)")
-        db.execSQL("CREATE TABLE messages(id INTEGER PRIMARY KEY AUTOINCREMENT, conv_id INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, ts INTEGER NOT NULL)")
-        db.execSQL("CREATE TABLE reminders(id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL, at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'pending')")
+        Schema.CREATE_V3.forEach { db.execSQL(it) }
     }
     override fun onUpgrade(db: SQLiteDatabase, o: Int, n: Int) {
-        if (o < 2) db.execSQL("ALTER TABLE reminders ADD COLUMN state TEXT NOT NULL DEFAULT 'pending'")
+        Schema.upgrade(o).forEach { db.execSQL(it) }
     }
 
     fun newConversation(title: String): Long {
@@ -39,8 +37,13 @@ class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 2) {
         return out
     }
     fun deleteConversation(id: Long) {
-        writableDatabase.delete("messages", "conv_id=?", arrayOf(id.toString()))
-        writableDatabase.delete("conversations", "id=?", arrayOf(id.toString()))
+        val d = writableDatabase
+        d.beginTransaction()
+        try {
+            d.delete("messages", "conv_id=?", arrayOf(id.toString()))
+            d.delete("conversations", "id=?", arrayOf(id.toString()))
+            d.setTransactionSuccessful()
+        } finally { d.endTransaction() }
     }
     fun addMessage(convId: Long, role: String, text: String): Msg {
         val now = System.currentTimeMillis()
@@ -78,8 +81,14 @@ class Db(context: Context) : SQLiteOpenHelper(context, "momolite.db", null, 2) {
 
     /** Wipes every locally stored row: conversations, messages and reminders. */
     fun clearAll() {
-        writableDatabase.delete("messages", null, null)
-        writableDatabase.delete("conversations", null, null)
-        writableDatabase.delete("reminders", null, null)
+        val d = writableDatabase
+        d.beginTransaction()
+        try {
+            d.delete("messages", null, null)
+            d.delete("conversations", null, null)
+            d.delete("reminders", null, null)
+            d.setTransactionSuccessful()
+        } finally { d.endTransaction() }
+        d.execSQL("VACUUM") // physically drop deleted rows from the file
     }
 }

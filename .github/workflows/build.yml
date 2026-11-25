@@ -1,34 +1,114 @@
 name: Build APK
 
+# Manual only. Nothing runs on push or pull request.
 on:
   workflow_dispatch:
+    inputs:
+      build_type:
+        description: "debug (default, debug-signed) or release (needs the signing Secrets)"
+        type: choice
+        options: [debug, release]
+        default: debug
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+
+      - name: Secret and hardening scan (source only)
+        run: |
+          set -e
+          if grep -rEn --include='*.kt' --include='*.xml' --include='*.gradle' --include='*.pro' \
+               -e 'sk-[A-Za-z0-9]{20,}' -e 'ghp_[A-Za-z0-9]{30,}' -e 'AIza[0-9A-Za-z_-]{35}' -e 'BEGIN [A-Z ]*PRIVATE KEY' app; then
+            echo "Possible secret found in source" >&2; exit 1
+          fi
+          if find . -name '*.jks' -o -name '*.keystore' -o -name '*.p12' | grep -q .; then
+            echo "Keystore file found in the repository" >&2; exit 1
+          fi
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      - name: Run unit tests
+
+      - name: Unit tests (logic, providers with a fake network, SQLite migrations, security regressions)
         run: gradle testDebugUnitTest --no-daemon
+
       - name: Lint
         run: gradle lintDebug --no-daemon
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon
+
+      - name: Dependency audit (public vulnerability database lookup by library name and version only)
+        run: |
+          gradle :app:dependencies --configuration releaseRuntimeClasspath --no-daemon -q > deps.txt
+          python3 tools/osv_audit.py deps.txt | tee osv-report.txt
+
+      - name: Prepare release keystore from Secrets
+        if: ${{ inputs.build_type == 'release' }}
+        env:
+          KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          KEYSTORE_PW: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PW" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "Missing signing Secrets. A release build is never signed with a debug key." >&2
+            echo "Required Secrets: SIGNING_KEYSTORE_BASE64, SIGNING_KEYSTORE_PASSWORD, SIGNING_KEY_ALIAS (see docs/SIGNING.md)" >&2
+            exit 1
+          fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.p12"
+          echo "SIGNING_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        env:
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        run: |
+          if [ "${{ inputs.build_type }}" = "release" ]; then
+            gradle assembleRelease --no-daemon
+          else
+            gradle assembleDebug --no-daemon
+          fi
+
+      - name: Collect APK, version and SHA-256
+        run: |
+          set -e
+          TYPE="${{ inputs.build_type }}"
+          VERSION=$(grep -oP "versionName '\K[^']+" app/build.gradle)
+          CODE=$(grep -oP "versionCode \K[0-9]+" app/build.gradle)
+          mkdir -p dist
+          SRC=$(ls app/build/outputs/apk/$TYPE/*.apk | head -n1)
+          OUT="instinct-lite-${VERSION}-${TYPE}.apk"
+          cp "$SRC" "dist/$OUT"
+          if [ "$TYPE" = "release" ]; then
+            $ANDROID_HOME/build-tools/$(ls $ANDROID_HOME/build-tools | sort -V | tail -n1)/apksigner verify --print-certs "dist/$OUT" > dist/signature.txt
+          fi
+          (cd dist && sha256sum "$OUT" > "$OUT.sha256")
+          printf 'version=%s\nversionCode=%s\nbuild=%s\ncommit=%s\nrun=%s\n' "$VERSION" "$CODE" "$TYPE" "$GITHUB_SHA" "$GITHUB_RUN_NUMBER" > dist/build-info.txt
+          cat dist/build-info.txt dist/*.sha256
+          ls -l dist
+
       - uses: actions/upload-artifact@v4
         with:
-          name: instinct-lite-debug-apk-run-${{ github.run_number }}
-          path: app/build/outputs/apk/debug/app-debug.apk
-      - name: Upload lint report
+          name: instinct-lite-${{ inputs.build_type }}-run-${{ github.run_number }}
+          path: dist/
+          retention-days: 14
+
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lint-report-run-${{ github.run_number }}
-          path: app/build/reports/lint-results-debug.html
+          name: reports-run-${{ github.run_number }}
+          path: |
+            app/build/reports/lint-results-debug.html
+            app/build/reports/tests/testDebugUnitTest/
+            osv-report.txt
           if-no-files-found: ignore
+          retention-days: 14

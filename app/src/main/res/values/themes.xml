@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Hamo" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#0F766E</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#CDEDE8</item>
+        <item name="colorOnPrimaryContainer">#00201D</item>
+        <item name="colorSecondary">#4A6360</item>
+        <item name="colorSecondaryContainer">#CCE8E4</item>
+        <item name="colorTertiary">#8A5A00</item>
+        <item name="colorTertiaryContainer">#FFDDB0</item>
+        <item name="colorOnTertiaryContainer">#2B1700</item>
+        <item name="colorSurface">#F7FAF9</item>
+        <item name="colorSurfaceVariant">#DAE5E2</item>
+        <item name="colorOnSurface">#191C1C</item>
+        <item name="colorOnSurfaceVariant">#3F4947</item>
+        <item name="android:colorBackground">#F7FAF9</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:fontFamily">@font/tajawal</item>
+        <item name="fontFamily">@font/tajawal</item>
+        <item name="android:layoutDirection">rtl</item>
+        <item name="android:textDirection">rtl</item>
+    </style>
+</resources>
