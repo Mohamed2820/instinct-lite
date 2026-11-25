@@ -19,8 +19,9 @@ object Bubbles {
         }
         bubble.setBackgroundResource(bg)
         bubble.setTextColor(MaterialColors.getColor(bubble, fg))
-        // In RTL, START is the right edge: the user's own messages sit on the right.
-        (bubble.layoutParams as FrameLayout.LayoutParams).gravity = if (msg.role == "user") Gravity.START else Gravity.END
+        // Absolute sides (not START/END) so placement does not depend on layout-direction resolution:
+        // the user's own messages sit on the right, replies and notices on the left.
+        (bubble.layoutParams as FrameLayout.LayoutParams).gravity = if (msg.role == "user") Gravity.RIGHT else Gravity.LEFT
     }
 }
 

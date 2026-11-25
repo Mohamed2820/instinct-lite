@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
-import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -18,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.materialswitch.MaterialSwitch
@@ -291,7 +291,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- settings ----
-    private fun selectedType(): ProviderType = when (findViewById<RadioGroup>(R.id.provider_type).checkedRadioButtonId) {
+    private fun selectedType(): ProviderType = when (findViewById<ChipGroup>(R.id.provider_type).checkedChipId) {
         R.id.type_cloudflare -> ProviderType.CLOUDFLARE
         R.id.type_custom -> ProviderType.CUSTOM
         else -> ProviderType.OPENAI_COMPATIBLE
@@ -307,7 +307,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupSettings() {
-        findViewById<RadioGroup>(R.id.provider_type).setOnCheckedChangeListener { _, _ ->
+        findViewById<ChipGroup>(R.id.provider_type).setOnCheckedStateChangeListener { _, _ ->
             applyTypeUi()
             val m = findViewById<TextInputEditText>(R.id.settings_model)
             if (m.text.isNullOrBlank()) m.setText(ProviderChoice.defaultModel(selectedType()))
@@ -368,7 +368,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshSettings() {
         val cfg = ApiSettings.config(this)
         val type = cfg?.type ?: ProviderType.OPENAI_COMPATIBLE
-        findViewById<RadioGroup>(R.id.provider_type).check(when (type) {
+        findViewById<ChipGroup>(R.id.provider_type).check(when (type) {
             ProviderType.CLOUDFLARE -> R.id.type_cloudflare
             ProviderType.CUSTOM -> R.id.type_custom
             else -> R.id.type_openai

@@ -3,7 +3,8 @@
     android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
     android:gravity="center" android:padding="32dp" android:layoutDirection="rtl"
     android:background="?android:attr/colorBackground" android:fitsSystemWindows="true">
-    <ImageView android:layout_width="112dp" android:layout_height="112dp" android:src="@drawable/ic_launcher"
+    <ImageView android:layout_width="112dp" android:layout_height="112dp" android:src="@drawable/ic_launcher_fg"
+        android:background="@drawable/welcome_icon_bg" android:clipToOutline="true" android:scaleType="centerCrop"
         android:importantForAccessibility="no"/>
     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="24dp"
         android:text="@string/welcome_title" android:textAppearance="?attr/textAppearanceHeadlineSmall"
