@@ -56,4 +56,4 @@ gradle testDebugUnitTest lintDebug assembleDebug
 
 ## الرخصة
 
-MIT. شوف `LICENSE`. خط Tajawal مرخّص تحت SIL Open Font License (`app/src/main/res/font/OFL.txt`).
+MIT. شوف `LICENSE`. خط Tajawal مرخّص تحت SIL Open Font License (`licenses/Tajawal-OFL.txt`).
